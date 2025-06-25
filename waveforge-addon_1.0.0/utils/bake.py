@@ -69,3 +69,51 @@ def bake_sound_to_channels(obj, context, path, lo, hi, intensity_multiplier,
             fc.select = False
     finally:
         context.area.type = original_area_type
+
+def bake_sound_to_rna(obj, context, rna_path, array_index, filepath, low, high, intensity=1.0, additive=False):
+    """
+    Bake audio to any animatable property via RNA path.
+    """
+    if not obj.animation_data:
+        obj.animation_data_create()
+    if not obj.animation_data.action:
+        obj.animation_data.action = bpy.data.actions.new(name=f"{obj.name}_WaveForgeAction")
+
+    action = obj.animation_data.action
+    fcurves = action.fcurves
+
+    # Remove existing if not additive
+    if not additive:
+        existing = fcurves.find(rna_path, index=array_index)
+        if existing:
+            fcurves.remove(existing)
+
+    # Insert a keyframe to create the F-Curve
+    obj.keyframe_insert(data_path=rna_path, index=array_index, frame=context.scene.frame_current)
+    fc = fcurves.find(rna_path, index=array_index)
+
+    if not fc:
+        print(f"Could not find or create F-Curve at {rna_path} [{array_index}]")
+        return
+
+    context_override = context.copy()
+    context_override["area"].type = 'GRAPH_EDITOR'
+
+    try:
+        for f in fcurves:
+            f.select = False
+        fc.select = True
+
+        bpy.ops.graph.sound_to_samples(context_override, filepath=filepath, low=low, high=high, use_additive=additive)
+        bpy.ops.graph.samples_to_keys(context_override)
+
+        if intensity != 1.0:
+            for kf in fc.keyframe_points:
+                kf.co.y *= intensity
+                kf.handle_left.y *= intensity
+                kf.handle_right.y *= intensity
+
+        fc.select = False
+
+    finally:
+        context_override["area"].type = context.area.type

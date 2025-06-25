@@ -32,3 +32,9 @@ class WAVEFORGE_PT_main_panel(bpy.types.Panel):
         box.prop(props, "animate_axis_z")
         box.prop(props, "additive_mode")
         box.operator("waveforge.visualize_selected")
+
+        box = layout.box()
+        box.label(text="Custom RNA Bake")
+        box.prop(props, "rna_path")
+        box.prop(props, "array_index")
+        box.operator("waveforge.bake_to_rna")

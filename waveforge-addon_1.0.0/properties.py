@@ -16,5 +16,17 @@ class WaveForgeProperties(bpy.types.PropertyGroup):
 
     additive_mode: bpy.props.BoolProperty(name="Additive", default=False)
 
+    # RNA path inputs for custom property animation
+    rna_path: bpy.props.StringProperty(
+        name="Data Path",
+        description="RNA path to the property (e.g. data.shape_keys.key_blocks[\"Key 1\"].value)"
+    )
+    array_index: bpy.props.IntProperty(
+        name="Index",
+        description="Index for array properties (0 for most scalar values)",
+        default=0,
+        min=0
+    )
+
     info_generate: bpy.props.BoolProperty(name="Generate visualizer elements.", default=False)
     info_animate: bpy.props.BoolProperty(name="Apply animation to selected objects.", default=False)
