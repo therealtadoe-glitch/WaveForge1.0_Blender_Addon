@@ -23,32 +23,37 @@ signal tab_selected(index: int, label: String)
 @export_group("Layout")
 @export var bar_width: float = 340.0:
 	set(value):
-		bar_width = max(value, 120.0)
+		bar_width = maxf(value, 120.0)
 		_refresh_layout()
 
 @export var bar_height: float = 72.0:
 	set(value):
-		bar_height = max(value, 44.0)
+		bar_height = maxf(value, 44.0)
 		_refresh_layout()
 
-@export var bottom_offset: float = 24.0:
+@export var content_offset: Vector2 = Vector2.ZERO:
 	set(value):
-		bottom_offset = max(value, 0.0)
+		content_offset = value
 		_refresh_layout()
 
 @export var side_padding: float = 18.0:
 	set(value):
-		side_padding = max(value, 0.0)
+		side_padding = maxf(value, 0.0)
+		_refresh_layout()
+
+@export var vertical_padding: float = 8.0:
+	set(value):
+		vertical_padding = maxf(value, 0.0)
 		_refresh_layout()
 
 @export var item_spacing: float = 20.0:
 	set(value):
-		item_spacing = max(value, 0.0)
+		item_spacing = maxf(value, 0.0)
 		_refresh_layout()
 
 @export var icon_label_spacing: float = 6.0:
 	set(value):
-		icon_label_spacing = max(value, 0.0)
+		icon_label_spacing = maxf(value, 0.0)
 		_rebuild_tabs()
 
 @export_group("Colors")
@@ -80,12 +85,12 @@ signal tab_selected(index: int, label: String)
 @export_group("Bar Styling")
 @export var corner_radius: float = 30.0:
 	set(value):
-		corner_radius = max(value, 0.0)
+		corner_radius = maxf(value, 0.0)
 		queue_redraw()
 
 @export var border_width: float = 1.0:
 	set(value):
-		border_width = max(value, 0.0)
+		border_width = maxf(value, 0.0)
 		queue_redraw()
 
 @export var border_color: Color = Color(0.85, 0.85, 0.88, 0.8):
@@ -104,9 +109,9 @@ signal tab_selected(index: int, label: String)
 		shadow_color = value
 		queue_redraw()
 
-@export var shadow_blur: float = 18.0:
+@export var shadow_size: Vector2 = Vector2(20, 14):
 	set(value):
-		shadow_blur = max(value, 0.0)
+		shadow_size = Vector2(maxf(value.x, 0.0), maxf(value.y, 0.0))
 		queue_redraw()
 
 @export var shadow_offset: Vector2 = Vector2(0, 8):
@@ -148,6 +153,7 @@ func _ensure_ui() -> void:
 	_button_root.name = "TabButtons"
 	_button_root.alignment = BoxContainer.ALIGNMENT_CENTER
 	_button_root.mouse_filter = MOUSE_FILTER_PASS
+	_button_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_button_root)
 
 func _refresh_layout() -> void:
@@ -155,18 +161,15 @@ func _refresh_layout() -> void:
 		return
 	_ensure_ui()
 
-	custom_minimum_size = Vector2(bar_width, bar_height + bottom_offset)
-	set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	offset_left = (size.x - bar_width) * 0.5
-	offset_right = offset_left + bar_width
-	offset_bottom = -bottom_offset
-	offset_top = offset_bottom - bar_height
+	custom_minimum_size = Vector2(bar_width, bar_height)
+	size = Vector2(maxf(size.x, bar_width), maxf(size.y, bar_height))
 
-	if _button_root:
-		_button_root.position = Vector2(side_padding, 0)
-		_button_root.custom_minimum_size = Vector2(max(bar_width - side_padding * 2.0, 0.0), bar_height)
-		_button_root.size = _button_root.custom_minimum_size
-		_button_root.add_theme_constant_override("separation", int(item_spacing))
+	var bar_rect := _get_bar_rect()
+	_button_root.offset_left = bar_rect.position.x + side_padding
+	_button_root.offset_top = bar_rect.position.y + vertical_padding
+	_button_root.offset_right = -(size.x - bar_rect.end.x + side_padding)
+	_button_root.offset_bottom = -(size.y - bar_rect.end.y + vertical_padding)
+	_button_root.add_theme_constant_override("separation", int(item_spacing))
 
 	queue_redraw()
 
@@ -190,9 +193,11 @@ func _rebuild_tabs() -> void:
 		button.flat = true
 		button.focus_mode = Control.FOCUS_NONE
 		button.toggle_mode = true
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		button.mouse_filter = MOUSE_FILTER_STOP
-		button.custom_minimum_size = Vector2(48, bar_height - 8)
+		button.custom_minimum_size = Vector2(60, 0)
 		button.pressed.connect(_on_tab_pressed.bind(i))
 		button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 		button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
@@ -202,6 +207,7 @@ func _rebuild_tabs() -> void:
 		var content := VBoxContainer.new()
 		content.alignment = BoxContainer.ALIGNMENT_CENTER
 		content.mouse_filter = MOUSE_FILTER_IGNORE
+		content.set_anchors_preset(Control.PRESET_FULL_RECT)
 		content.add_theme_constant_override("separation", int(icon_label_spacing))
 
 		var icon := TextureRect.new()
@@ -210,6 +216,7 @@ func _rebuild_tabs() -> void:
 		icon.custom_minimum_size = Vector2(24, 24)
 		icon.texture = tab_icons[i] if i < tab_icons.size() else null
 		icon.mouse_filter = MOUSE_FILTER_IGNORE
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 		var label := Label.new()
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -251,16 +258,16 @@ func _on_tab_pressed(index: int) -> void:
 	tab_selected.emit(index, tab_labels[index] if index < tab_labels.size() else "")
 
 func _draw() -> void:
-	var rect := Rect2(Vector2.ZERO, Vector2(bar_width, bar_height))
-	rect.position = Vector2((size.x - bar_width) * 0.5, size.y - bar_height - bottom_offset)
+	var bar_rect := _get_bar_rect()
 
-	if shadow_enabled and shadow_blur > 0.0:
-		var shadow_rect := Rect2(rect.position + shadow_offset - Vector2(shadow_blur, shadow_blur), rect.size + Vector2(shadow_blur * 2.0, shadow_blur * 2.0))
+	if shadow_enabled:
+		var shadow_rect := Rect2(
+			bar_rect.position + shadow_offset - shadow_size * 0.5,
+			bar_rect.size + shadow_size
+		)
 		draw_rect(shadow_rect, shadow_color, true)
 
-	_draw_bar_style(StyleBoxFlat.new(), rect)
-
-func _draw_bar_style(style: StyleBoxFlat, rect: Rect2) -> void:
+	var style := StyleBoxFlat.new()
 	style.bg_color = bar_color
 	style.corner_radius_top_left = int(corner_radius)
 	style.corner_radius_top_right = int(corner_radius)
@@ -271,4 +278,8 @@ func _draw_bar_style(style: StyleBoxFlat, rect: Rect2) -> void:
 	style.border_width_top = int(border_width)
 	style.border_width_right = int(border_width)
 	style.border_width_bottom = int(border_width)
-	draw_style_box(style, rect)
+	draw_style_box(style, bar_rect)
+
+func _get_bar_rect() -> Rect2:
+	var bar_pos := (size - Vector2(bar_width, bar_height)) * 0.5 + content_offset
+	return Rect2(bar_pos, Vector2(bar_width, bar_height))
